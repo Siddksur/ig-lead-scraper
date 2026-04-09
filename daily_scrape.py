@@ -2,6 +2,10 @@
 daily_scrape.py — Daily Instagram lead scraper for Canadian real estate agents.
 Runs via GitHub Actions at 9am EST.
 Pipeline: Apify → clean names → Google Sheets → GoHighLevel
+
+City rotation: scrapes one city at a time until 500 leads are collected,
+then automatically moves to the next city.
+Cities: Toronto → Vancouver → Calgary → Edmonton → Mississauga → Hamilton → Halifax → Ottawa
 """
 
 import os
@@ -19,25 +23,101 @@ GHL_API_KEY = os.environ["GHL_API_KEY"]
 SHEET_ID    = os.environ["GOOGLE_SHEET_ID"]
 SA_JSON     = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
 
-ACTOR_ID = "easy_scraper~instagram-leads-scraper"
+ACTOR_ID   = "easy_scraper~instagram-leads-scraper"
 APIFY_BASE = "https://api.apify.com/v2"
 GHL_URL    = "https://services.leadconnectorhq.com/contacts/"
 GHL_TAGS   = ["cold-leads", "cold-email", "apify", "IG cold leads"]
 
-ACTOR_INPUT = {
-    "keywords": [
-        "real estate agent",
-        "realtor",
-        "real estate broker",
-        "real estate Canada",
-        "Canadian realtor",
+TARGET_PER_CITY = 500
+
+SHEET_HEADERS = ["Name", "Email", "Instagram URL", "Phone", "Status", "Date Added", "City"]
+
+# ── City rotation ─────────────────────────────────────────────────────────────
+CITIES = [
+    "Toronto", "Vancouver", "Calgary", "Edmonton",
+    "Mississauga", "Hamilton", "Halifax", "Ottawa",
+]
+
+CITY_KEYWORDS = {
+    "Toronto": [
+        "Toronto realtor",
+        "Toronto real estate agent",
+        "Toronto real estate broker",
+        "Toronto homes agent",
+        "realtor Toronto Ontario",
     ],
-    "country":            "Canada",
-    "collectEmails":      True,
-    "maxLeadsPerKeyword": 100,
+    "Vancouver": [
+        "Vancouver realtor",
+        "Vancouver real estate agent",
+        "Vancouver real estate broker",
+        "Vancouver homes agent",
+        "realtor Vancouver BC",
+    ],
+    "Calgary": [
+        "Calgary realtor",
+        "Calgary real estate agent",
+        "Calgary real estate broker",
+        "Calgary homes agent",
+        "realtor Calgary Alberta",
+    ],
+    "Edmonton": [
+        "Edmonton realtor",
+        "Edmonton real estate agent",
+        "Edmonton real estate broker",
+        "Edmonton homes agent",
+        "realtor Edmonton Alberta",
+    ],
+    "Mississauga": [
+        "Mississauga realtor",
+        "Mississauga real estate agent",
+        "Mississauga real estate broker",
+        "Mississauga homes agent",
+        "realtor Mississauga Ontario",
+    ],
+    "Hamilton": [
+        "Hamilton realtor",
+        "Hamilton real estate agent",
+        "Hamilton real estate broker",
+        "Hamilton Ontario homes agent",
+        "realtor Hamilton Ontario",
+    ],
+    "Halifax": [
+        "Halifax realtor",
+        "Halifax real estate agent",
+        "Halifax real estate broker",
+        "Halifax Nova Scotia homes agent",
+        "realtor Halifax Nova Scotia",
+    ],
+    "Ottawa": [
+        "Ottawa realtor",
+        "Ottawa real estate agent",
+        "Ottawa real estate broker",
+        "Ottawa homes agent",
+        "realtor Ottawa Ontario",
+    ],
 }
 
-SHEET_HEADERS = ["Name", "Email", "Instagram URL", "Phone", "Status", "Date Added"]
+
+def get_current_city(ws) -> tuple:
+    """
+    Read the City column (G) from the sheet, count leads per city,
+    and return (city_to_scrape_today, {city: count}).
+    """
+    city_col = ws.col_values(7)   # column G
+    counts = {city: 0 for city in CITIES}
+    for val in city_col[1:]:      # skip header row
+        val = val.strip()
+        if val in counts:
+            counts[val] += 1
+
+    for city in CITIES:
+        if counts[city] < TARGET_PER_CITY:
+            return city, counts
+
+    # All 8 cities complete — restart from Toronto
+    print("[City] All cities have reached 500 leads! Restarting from Toronto.")
+    return CITIES[0], counts
+
 
 # ── Google Sheets ─────────────────────────────────────────────────────────────
 def get_worksheet():
@@ -48,10 +128,19 @@ def get_worksheet():
     gc = gspread.authorize(creds)
     ws = gc.open_by_key(SHEET_ID).sheet1
 
-    # Add header row if sheet is empty
-    if not ws.row_values(1):
+    existing_headers = ws.row_values(1)
+
+    if not existing_headers:
+        # Fresh sheet — write full headers
         ws.append_row(SHEET_HEADERS, value_input_option="USER_ENTERED")
-        ws.format("A1:F1", {
+        ws.format("A1:G1", {
+            "textFormat": {"bold": True},
+            "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
+        })
+    elif "City" not in existing_headers:
+        # Sheet exists but predates city column — add it
+        ws.update_cell(1, 7, "City")
+        ws.format("G1", {
             "textFormat": {"bold": True},
             "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
         })
@@ -61,14 +150,14 @@ def get_worksheet():
 
 def get_existing_emails(ws) -> set:
     """Return lowercased set of all emails already in column B."""
-    emails = ws.col_values(2)   # column B (1-indexed)
-    return {e.strip().lower() for e in emails[1:] if e.strip()}  # skip header
+    emails = ws.col_values(2)
+    return {e.strip().lower() for e in emails[1:] if e.strip()}
 
 
 def append_lead(ws, row_data: list) -> int:
     """Append a row and return its 1-indexed row number."""
     ws.append_row(row_data, value_input_option="USER_ENTERED")
-    return len(ws.col_values(1))   # length of column A after append
+    return len(ws.col_values(1))
 
 
 def set_status(ws, row: int, success: bool):
@@ -95,18 +184,16 @@ def set_status(ws, row: int, success: bool):
 
 
 # ── Apify ─────────────────────────────────────────────────────────────────────
-def run_apify() -> list:
-    # Start actor run
+def run_apify(actor_input: dict) -> list:
     resp = requests.post(
         f"{APIFY_BASE}/acts/{ACTOR_ID}/runs?token={APIFY_TOKEN}",
-        json=ACTOR_INPUT,
+        json=actor_input,
         timeout=30,
     )
     resp.raise_for_status()
     run_id = resp.json()["data"]["id"]
     print(f"[Apify] Run started → {run_id}")
 
-    # Poll until terminal status
     terminal = {"SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"}
     while True:
         r = requests.get(
@@ -124,7 +211,6 @@ def run_apify() -> list:
             break
         time.sleep(15)
 
-    # Fetch dataset
     r = requests.get(
         f"{APIFY_BASE}/datasets/{dataset_id}/items"
         f"?token={APIFY_TOKEN}&format=json&clean=true",
@@ -258,7 +344,6 @@ def resolve_name(full_name: str, bio: str) -> str:
 
 # ── Phone extraction ──────────────────────────────────────────────────────────
 def extract_phone(bio: str) -> str:
-    """Extract the first North American phone number found in bio text."""
     if not bio:
         return ""
     match = re.search(
@@ -312,10 +397,28 @@ def main():
     print(f"  IG Lead Scraper — {today} UTC")
     print(f"{'='*60}\n")
 
-    # 1. Scrape via Apify
-    items = run_apify()
+    # 1. Load sheet and determine which city to scrape today
+    ws = get_worksheet()
+    existing = get_existing_emails(ws)
+    current_city, city_counts = get_current_city(ws)
 
-    # 2. Filter to email-only + deduplicate within this batch
+    print(f"[City] Today's target: {current_city}")
+    print(f"[City] Progress:")
+    for city in CITIES:
+        bar = "█" * (city_counts[city] // 25)  # 1 block per 25 leads
+        print(f"        {city:<12} {city_counts[city]:>3}/500  {bar}")
+    print()
+
+    # 2. Scrape via Apify using city-specific keywords
+    actor_input = {
+        "keywords":          CITY_KEYWORDS[current_city],
+        "country":           "Canada",
+        "collectEmails":     True,
+        "maxLeadsPerKeyword": 100,
+    }
+    items = run_apify(actor_input)
+
+    # 3. Filter to email-only + deduplicate within this batch
     seen: dict = {}
     for item in items:
         email = (item.get("email") or "").strip()
@@ -326,9 +429,7 @@ def main():
             seen[key] = item
     print(f"[Filter] {len(seen)} unique leads with email")
 
-    # 3. Load Google Sheet, skip already-existing emails
-    ws = get_worksheet()
-    existing = get_existing_emails(ws)
+    # 4. Skip leads already in the sheet
     new_leads = {k: v for k, v in seen.items() if k not in existing}
     print(f"[Sheet]  {len(existing)} existing | {len(new_leads)} new\n")
 
@@ -336,7 +437,7 @@ def main():
         print("[Done] No new leads today — nothing to add.")
         return
 
-    # 4. Process each new lead
+    # 5. Process each new lead
     sent = failed = skipped = 0
 
     for email, item in new_leads.items():
@@ -352,25 +453,29 @@ def main():
             skipped += 1
             continue
 
-        # Append row to sheet (status filled after GHL call)
-        row_data = [name, email, ig_url, phone, "", today]
+        row_data = [name, email, ig_url, phone, "", today, current_city]
         row_num  = append_lead(ws, row_data)
 
-        # Push to GHL
         success = create_ghl_contact(name, email, ig_url, phone)
         set_status(ws, row_num, success)
 
         if success:
             sent += 1
-            print(f"[OK]    {name} <{email}>")
+            print(f"[OK]    {name} <{email}>  [{current_city}]")
         else:
             failed += 1
-            print(f"[FAIL]  {name} <{email}>")
+            print(f"[FAIL]  {name} <{email}>  [{current_city}]")
 
-        time.sleep(0.4)   # stay well within GHL rate limits
+        time.sleep(0.4)
 
     print(f"\n{'='*60}")
+    print(f"  City: {current_city}")
     print(f"  Sent: {sent}  |  Failed: {failed}  |  Skipped: {skipped}")
+    updated_count = city_counts[current_city] + sent
+    print(f"  {current_city} total: {updated_count}/500")
+    if updated_count >= TARGET_PER_CITY:
+        next_city = CITIES[(CITIES.index(current_city) + 1) % len(CITIES)]
+        print(f"  ✓ {current_city} complete! Tomorrow: {next_city}")
     print(f"{'='*60}")
 
 
