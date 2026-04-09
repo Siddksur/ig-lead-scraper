@@ -414,7 +414,7 @@ def main():
         "keywords":          CITY_KEYWORDS[current_city],
         "country":           "Canada",
         "collectEmails":     True,
-        "maxLeadsPerKeyword": 10,
+        "maxLeadsPerKeyword": 50,
     }
     items = run_apify(actor_input)
 
