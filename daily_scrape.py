@@ -31,7 +31,7 @@ GHL_TAGS   = ["cold-leads", "cold-email", "apify", "IG cold leads"]
 
 TARGET_PER_CITY = 500
 
-SHEET_HEADERS = ["Name", "Email", "Instagram URL", "Phone", "Status", "Date Added", "City"]
+SHEET_HEADERS = ["Name", "Email", "Instagram URL", "Phone", "Status", "Date Added", "City", "IG Followers"]
 
 # ── City rotation ─────────────────────────────────────────────────────────────
 CITIES = [
@@ -134,7 +134,7 @@ def get_worksheet():
     if not existing_headers:
         # Fresh sheet — write full headers
         ws.append_row(SHEET_HEADERS, value_input_option="USER_ENTERED")
-        ws.format("A1:G1", {
+        ws.format("A1:H1", {
             "textFormat": {"bold": True},
             "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
         })
@@ -142,6 +142,18 @@ def get_worksheet():
         # Sheet exists but predates city column — add it
         ws.update_cell(1, 7, "City")
         ws.format("G1", {
+            "textFormat": {"bold": True},
+            "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
+        })
+        ws.update_cell(1, 8, "IG Followers")
+        ws.format("H1", {
+            "textFormat": {"bold": True},
+            "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
+        })
+    elif "IG Followers" not in existing_headers:
+        # Sheet exists but predates IG Followers column — add it
+        ws.update_cell(1, 8, "IG Followers")
+        ws.format("H1", {
             "textFormat": {"bold": True},
             "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
         })
@@ -360,7 +372,8 @@ def extract_phone(bio: str) -> str:
 
 
 # ── GoHighLevel ───────────────────────────────────────────────────────────────
-def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str) -> bool:
+def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str,
+                       follower_count: int = 0) -> bool:
     parts = name.strip().split(None, 1)
     payload = {
         "firstName":  parts[0] if parts else name,
@@ -370,6 +383,9 @@ def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str) ->
         "tags":       GHL_TAGS,
         "website":    instagram_url,
         "source":     "Instagram Scraper",
+        "customFields": [
+            {"key": "contact.ig_followers", "field_value": str(follower_count)},
+        ],
     }
     if phone:
         payload["phone"] = phone
@@ -446,17 +462,18 @@ def main():
         bio       = item.get("bio") or ""
         ig_url    = item.get("profile_url") or ""
 
-        name  = resolve_name(full_name, bio)
-        phone = extract_phone(bio)
+        name           = resolve_name(full_name, bio)
+        phone          = extract_phone(bio)
+        follower_count = int(item.get("follower_count") or 0)
 
         if not name:
             print(f"[Skip]  No name resolved for {email}")
             skipped += 1
             continue
 
-        success = create_ghl_contact(name, email, ig_url, phone)
+        success = create_ghl_contact(name, email, ig_url, phone, follower_count)
         batch.append({"name": name, "email": email, "ig_url": ig_url,
-                      "phone": phone, "success": success})
+                      "phone": phone, "followers": follower_count, "success": success})
 
         if success:
             sent += 1
@@ -475,7 +492,7 @@ def main():
     print(f"\n[Sheet] Writing {len(batch)} rows in batch...")
 
     # One append call for all rows (1 values.append request)
-    rows = [[b["name"], b["email"], b["ig_url"], b["phone"], "", today, current_city]
+    rows = [[b["name"], b["email"], b["ig_url"], b["phone"], "", today, current_city, b["followers"]]
             for b in batch]
     ws.append_rows(rows, value_input_option="USER_ENTERED")
     time.sleep(3)
