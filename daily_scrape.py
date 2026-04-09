@@ -18,10 +18,11 @@ from datetime import datetime
 from google.oauth2.service_account import Credentials
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-APIFY_TOKEN = os.environ["APIFY_TOKEN"]
-GHL_API_KEY = os.environ["GHL_API_KEY"]
-SHEET_ID    = os.environ["GOOGLE_SHEET_ID"]
-SA_JSON     = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
+APIFY_TOKEN     = os.environ["APIFY_TOKEN"]
+GHL_API_KEY     = os.environ["GHL_API_KEY"]
+GHL_LOCATION_ID = os.environ["GHL_LOCATION_ID"]
+SHEET_ID        = os.environ["GOOGLE_SHEET_ID"]
+SA_JSON         = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
 
 ACTOR_ID   = "easy_scraper~instagram-leads-scraper"
 APIFY_BASE = "https://api.apify.com/v2"
@@ -160,11 +161,10 @@ def append_lead(ws, row_data: list) -> int:
     return len(ws.col_values(1))
 
 
-def set_status(ws, row: int, success: bool):
-    """Colour-code the Status cell (column E) green or red."""
+def format_status(ws, row: int, success: bool):
+    """Colour-code an already-written Status cell (column E). Uses batchUpdate quota."""
     cell = f"E{row}"
     if success:
-        ws.update(cell, [["Sent to GHL"]])
         ws.format(cell, {
             "backgroundColor": {"red": 0.2, "green": 0.78, "blue": 0.35},
             "textFormat": {
@@ -173,7 +173,6 @@ def set_status(ws, row: int, success: bool):
             },
         })
     else:
-        ws.update(cell, [["Failed"]])
         ws.format(cell, {
             "backgroundColor": {"red": 0.9, "green": 0.2, "blue": 0.2},
             "textFormat": {
@@ -364,12 +363,13 @@ def extract_phone(bio: str) -> str:
 def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str) -> bool:
     parts = name.strip().split(None, 1)
     payload = {
-        "firstName": parts[0] if parts else name,
-        "lastName":  parts[1] if len(parts) > 1 else "",
-        "email":     email,
-        "tags":      GHL_TAGS,
-        "website":   instagram_url,
-        "source":    "Instagram Scraper",
+        "firstName":  parts[0] if parts else name,
+        "lastName":   parts[1] if len(parts) > 1 else "",
+        "email":      email,
+        "locationId": GHL_LOCATION_ID,
+        "tags":       GHL_TAGS,
+        "website":    instagram_url,
+        "source":     "Instagram Scraper",
     }
     if phone:
         payload["phone"] = phone
@@ -437,8 +437,9 @@ def main():
         print("[Done] No new leads today — nothing to add.")
         return
 
-    # 5. Process each new lead
+    # 5. Push to GHL first (collect results in memory — no sheet writes yet)
     sent = failed = skipped = 0
+    batch = []   # {name, email, ig_url, phone, success}
 
     for email, item in new_leads.items():
         full_name = (item.get("full_name") or "").strip()
@@ -453,11 +454,9 @@ def main():
             skipped += 1
             continue
 
-        row_data = [name, email, ig_url, phone, "", today, current_city]
-        row_num  = append_lead(ws, row_data)
-
         success = create_ghl_contact(name, email, ig_url, phone)
-        set_status(ws, row_num, success)
+        batch.append({"name": name, "email": email, "ig_url": ig_url,
+                      "phone": phone, "success": success})
 
         if success:
             sent += 1
@@ -467,6 +466,31 @@ def main():
             print(f"[FAIL]  {name} <{email}>  [{current_city}]")
 
         time.sleep(0.4)
+
+    if not batch:
+        print("[Done] All leads skipped — nothing to write.")
+        return
+
+    # 6. Batch write to Google Sheets (minimises API quota usage)
+    print(f"\n[Sheet] Writing {len(batch)} rows in batch...")
+
+    # One append call for all rows (1 values.append request)
+    rows = [[b["name"], b["email"], b["ig_url"], b["phone"], "", today, current_city]
+            for b in batch]
+    ws.append_rows(rows, value_input_option="USER_ENTERED")
+    time.sleep(3)
+
+    # One update call for all status text (1 values.update request)
+    first_row = len(ws.col_values(1)) - len(batch) + 1
+    status_values = [["Sent to GHL"] if b["success"] else ["Failed"] for b in batch]
+    ws.update(values=status_values, range_name=f"E{first_row}:E{first_row + len(batch) - 1}")
+    time.sleep(3)
+
+    # Format status cells (uses spreadsheets.batchUpdate — separate, more lenient quota)
+    print(f"[Sheet] Formatting {len(batch)} status cells...")
+    for i, b in enumerate(batch):
+        format_status(ws, first_row + i, b["success"])
+        time.sleep(0.5)
 
     print(f"\n{'='*60}")
     print(f"  City: {current_city}")
