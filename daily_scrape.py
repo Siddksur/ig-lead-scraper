@@ -39,62 +39,265 @@ CITIES = [
     "Mississauga", "Hamilton", "Halifax", "Ottawa",
 ]
 
+KEYWORD_BATCH_SIZE = 5   # keywords per daily run
+
+# 25 keywords per city (5 batches of 5, rotating daily)
 CITY_KEYWORDS = {
     "Toronto": [
+        # Batch 0
         "Toronto realtor",
         "Toronto real estate agent",
         "Toronto real estate broker",
         "Toronto homes agent",
         "realtor Toronto Ontario",
+        # Batch 1
+        "North York realtor",
+        "Scarborough real estate agent",
+        "Etobicoke realtor",
+        "Thornhill realtor",
+        "Markham real estate agent",
+        # Batch 2
+        "Richmond Hill realtor",
+        "GTA realtor",
+        "Toronto condo realtor",
+        "Toronto luxury real estate",
+        "Toronto first time buyer agent",
+        # Batch 3
+        "RE/MAX Toronto agent",
+        "Royal LePage Toronto",
+        "Toronto investment property agent",
+        "Toronto pre-construction realtor",
+        "Vaughan realtor",
+        # Batch 4
+        "Brampton realtor",
+        "Toronto new home realtor",
+        "Toronto downtown realtor",
+        "Toronto west end realtor",
+        "Toronto east end realtor",
     ],
     "Vancouver": [
+        # Batch 0
         "Vancouver realtor",
         "Vancouver real estate agent",
         "Vancouver real estate broker",
         "Vancouver homes agent",
         "realtor Vancouver BC",
+        # Batch 1
+        "Burnaby realtor",
+        "Surrey real estate agent",
+        "Richmond BC realtor",
+        "North Vancouver realtor",
+        "Coquitlam real estate agent",
+        # Batch 2
+        "West Vancouver real estate",
+        "Langley realtor",
+        "Abbotsford real estate agent",
+        "Lower Mainland realtor",
+        "BC realtor",
+        # Batch 3
+        "Vancouver condo realtor",
+        "Vancouver luxury real estate",
+        "Vancouver Island realtor",
+        "Kelowna realtor",
+        "Victoria BC realtor",
+        # Batch 4
+        "RE/MAX Vancouver",
+        "Royal LePage Vancouver",
+        "Vancouver pre-sale realtor",
+        "Vancouver first time buyer agent",
+        "Delta BC realtor",
     ],
     "Calgary": [
+        # Batch 0
         "Calgary realtor",
         "Calgary real estate agent",
         "Calgary real estate broker",
         "Calgary homes agent",
         "realtor Calgary Alberta",
+        # Batch 1
+        "NW Calgary realtor",
+        "SW Calgary real estate",
+        "SE Calgary realtor",
+        "NE Calgary real estate agent",
+        "Airdrie realtor",
+        # Batch 2
+        "Cochrane real estate agent",
+        "Okotoks realtor",
+        "Chestermere realtor",
+        "Bearspaw real estate",
+        "Strathmore realtor",
+        # Batch 3
+        "Calgary luxury real estate",
+        "Calgary condo realtor",
+        "Calgary first time buyer agent",
+        "Calgary investment property",
+        "Calgary new homes agent",
+        # Batch 4
+        "RE/MAX Calgary",
+        "Royal LePage Calgary",
+        "eXp Realty Calgary",
+        "Calgary acreage realtor",
+        "High River real estate agent",
     ],
     "Edmonton": [
+        # Batch 0
         "Edmonton realtor",
         "Edmonton real estate agent",
         "Edmonton real estate broker",
         "Edmonton homes agent",
         "realtor Edmonton Alberta",
+        # Batch 1
+        "St Albert realtor",
+        "Sherwood Park real estate agent",
+        "Spruce Grove realtor",
+        "Leduc real estate agent",
+        "Fort Saskatchewan realtor",
+        # Batch 2
+        "South Edmonton realtor",
+        "West Edmonton real estate",
+        "North Edmonton realtor",
+        "Stony Plain realtor",
+        "Beaumont real estate agent",
+        # Batch 3
+        "Edmonton luxury real estate",
+        "Edmonton condo realtor",
+        "Edmonton first time buyer agent",
+        "Edmonton new homes agent",
+        "Edmonton investment property",
+        # Batch 4
+        "RE/MAX Edmonton",
+        "Royal LePage Edmonton",
+        "eXp Realty Edmonton",
+        "Edmonton acreage realtor",
+        "Nisku real estate agent",
     ],
     "Mississauga": [
+        # Batch 0
         "Mississauga realtor",
         "Mississauga real estate agent",
         "Mississauga real estate broker",
         "Mississauga homes agent",
         "realtor Mississauga Ontario",
+        # Batch 1
+        "Port Credit realtor",
+        "Streetsville real estate agent",
+        "Erin Mills realtor",
+        "Meadowvale real estate",
+        "Cooksville realtor",
+        # Batch 2
+        "Oakville realtor",
+        "Burlington real estate agent",
+        "Milton Ontario realtor",
+        "Brampton real estate agent",
+        "Peel Region realtor",
+        # Batch 3
+        "Mississauga condo realtor",
+        "Mississauga luxury real estate",
+        "Mississauga first time buyer agent",
+        "Mississauga new homes agent",
+        "Mississauga investment property",
+        # Batch 4
+        "RE/MAX Mississauga",
+        "Royal LePage Mississauga",
+        "eXp Realty Mississauga",
+        "Mississauga pre-construction realtor",
+        "Halton Hills realtor",
     ],
     "Hamilton": [
+        # Batch 0
         "Hamilton realtor",
         "Hamilton real estate agent",
         "Hamilton real estate broker",
         "Hamilton Ontario homes agent",
         "realtor Hamilton Ontario",
+        # Batch 1
+        "Stoney Creek realtor",
+        "Ancaster real estate agent",
+        "Dundas realtor",
+        "Waterdown real estate",
+        "Flamborough realtor",
+        # Batch 2
+        "Burlington realtor",
+        "Grimsby real estate agent",
+        "Niagara realtor",
+        "St Catharines real estate agent",
+        "Brantford realtor",
+        # Batch 3
+        "Hamilton condo realtor",
+        "Hamilton luxury real estate",
+        "Hamilton first time buyer agent",
+        "Hamilton investment property",
+        "Golden Horseshoe realtor",
+        # Batch 4
+        "RE/MAX Hamilton",
+        "Royal LePage Hamilton",
+        "Niagara Falls realtor",
+        "Welland real estate agent",
+        "Hamilton new homes agent",
     ],
     "Halifax": [
+        # Batch 0
         "Halifax realtor",
         "Halifax real estate agent",
         "Halifax real estate broker",
         "Halifax Nova Scotia homes agent",
         "realtor Halifax Nova Scotia",
+        # Batch 1
+        "Dartmouth realtor",
+        "Bedford NS real estate agent",
+        "Cole Harbour realtor",
+        "Sackville NS realtor",
+        "Lower Sackville real estate",
+        # Batch 2
+        "Nova Scotia realtor",
+        "HRM realtor",
+        "Eastern Shore NS real estate",
+        "Truro Nova Scotia realtor",
+        "Bridgewater NS real estate agent",
+        # Batch 3
+        "Halifax condo realtor",
+        "Halifax luxury real estate",
+        "Halifax first time buyer agent",
+        "Halifax investment property",
+        "Halifax new homes agent",
+        # Batch 4
+        "RE/MAX Halifax",
+        "Royal LePage Halifax",
+        "eXp Realty Halifax",
+        "Halifax waterfront realtor",
+        "Hammonds Plains real estate agent",
     ],
     "Ottawa": [
+        # Batch 0
         "Ottawa realtor",
         "Ottawa real estate agent",
         "Ottawa real estate broker",
         "Ottawa homes agent",
         "realtor Ottawa Ontario",
+        # Batch 1
+        "Kanata realtor",
+        "Barrhaven real estate agent",
+        "Orleans realtor",
+        "Nepean real estate agent",
+        "Gloucester realtor",
+        # Batch 2
+        "Gatineau realtor",
+        "Stittsville real estate agent",
+        "Manotick realtor",
+        "Riverside South real estate",
+        "Westboro Ottawa realtor",
+        # Batch 3
+        "Ottawa condo realtor",
+        "Ottawa luxury real estate",
+        "Ottawa first time buyer agent",
+        "Ottawa investment property",
+        "Ottawa new homes agent",
+        # Batch 4
+        "RE/MAX Ottawa",
+        "Royal LePage Ottawa",
+        "eXp Realty Ottawa",
+        "Rockland Ontario realtor",
+        "Carleton Place real estate agent",
     ],
 }
 
@@ -118,6 +321,20 @@ def get_current_city(ws) -> tuple:
     # All 8 cities complete — restart from Toronto
     print("[City] All cities have reached 500 leads! Restarting from Toronto.")
     return CITIES[0], counts
+
+
+def get_keyword_batch(city: str, date: datetime) -> list:
+    """
+    Return today's batch of keywords for the given city.
+    Uses day-of-year to rotate through the pool — no extra state needed.
+    Each batch of 5 runs for one day before advancing to the next.
+    Full cycle repeats every (pool_size / KEYWORD_BATCH_SIZE) days.
+    """
+    pool = CITY_KEYWORDS[city]
+    num_batches = len(pool) // KEYWORD_BATCH_SIZE
+    batch_index = date.timetuple().tm_yday % num_batches
+    start = batch_index * KEYWORD_BATCH_SIZE
+    return pool[start : start + KEYWORD_BATCH_SIZE]
 
 
 # ── Google Sheets ─────────────────────────────────────────────────────────────
@@ -426,11 +643,22 @@ def main():
         print(f"        {city:<12} {city_counts[city]:>3}/500  {bar}")
     print()
 
-    # 2. Scrape via Apify using city-specific keywords
+    # 2. Scrape via Apify using today's keyword batch for the current city
+    today_dt = datetime.utcnow()
+    keywords_today = get_keyword_batch(current_city, today_dt)
+    pool_size  = len(CITY_KEYWORDS[current_city])
+    num_batches = pool_size // KEYWORD_BATCH_SIZE
+    batch_index = today_dt.timetuple().tm_yday % num_batches
+
+    print(f"[Keywords] Batch {batch_index + 1}/{num_batches} for {current_city}:")
+    for kw in keywords_today:
+        print(f"           • {kw}")
+    print()
+
     actor_input = {
-        "keywords":          CITY_KEYWORDS[current_city],
-        "country":           "Canada",
-        "collectEmails":     True,
+        "keywords":           keywords_today,
+        "country":            "Canada",
+        "collectEmails":      True,
         "maxLeadsPerKeyword": 50,
     }
     items = run_apify(actor_input)
