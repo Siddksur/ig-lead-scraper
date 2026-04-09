@@ -1,0 +1,34 @@
+name: Daily IG Lead Scraper
+
+on:
+  schedule:
+    - cron: '0 14 * * *'   # 9:00 AM EST (UTC-5) = 14:00 UTC
+                            # Note: clocks are currently on EDT (UTC-4),
+                            # so this runs at 10:00 AM until Nov DST change.
+                            # Change to '0 13 * * *' if you want 9am EDT in summer.
+  workflow_dispatch:        # allows a manual "Run workflow" button in GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90     # Apify run typically takes 30-60 min
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests gspread google-auth
+
+      - name: Run daily scraper
+        env:
+          APIFY_TOKEN:                 ${{ secrets.APIFY_TOKEN }}
+          GHL_API_KEY:                 ${{ secrets.GHL_API_KEY }}
+          GOOGLE_SHEET_ID:             ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python daily_scrape.py
