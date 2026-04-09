@@ -385,6 +385,7 @@ def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str,
         "source":     "Instagram Scraper",
         "customFields": [
             {"key": "contact.ig_followers", "field_value": str(follower_count)},
+            {"key": "contact.ig_profile",   "field_value": instagram_url},
         ],
     }
     if phone:
