@@ -500,8 +500,15 @@ def _strip_emoji(text: str) -> str:
     return text.strip()
 
 
+def _is_phone_number(text: str) -> bool:
+    digits = re.sub(r'\D', '', text)
+    return len(digits) >= 7 and len(re.sub(r'\d', '', text).strip()) < len(text) * 0.5
+
+
 def _is_person_name(name: str) -> bool:
     if not name or not name.strip():
+        return False
+    if _is_phone_number(name):
         return False
     n = _strip_emoji(name).lower()
     if any(kw in n for kw in NON_NAME_KEYWORDS):
@@ -512,11 +519,23 @@ def _is_person_name(name: str) -> bool:
     return True
 
 
+def _collapse_spaced_letters(text: str) -> str:
+    """Convert 'R A B I A U M A R' → 'Rabia Umar' by collapsing spaced single letters."""
+    words = text.split()
+    if len(words) >= 4 and all(len(w) == 1 and w.isalpha() for w in words):
+        collapsed = ''.join(words).title()
+        # Try to split into two roughly equal halves as first/last name
+        mid = len(collapsed) // 2
+        return collapsed[:mid] + ' ' + collapsed[mid:]
+    return text
+
+
 def _clean_person_name(raw: str) -> str:
     if not raw or not raw.strip():
         return ""
     name = _unicode_to_ascii(raw)
     name = _strip_emoji(name)
+    name = _collapse_spaced_letters(name)
     name = re.split(r"\s*[|/–•]\s*", name)[0].strip()
     name = re.sub(
         r",\s*(Broker|Realtor|Realty|Agent|Real Estate|PREC|REALTOR|"
@@ -616,6 +635,9 @@ def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str,
     try:
         resp = requests.post(GHL_URL, json=payload, headers=headers, timeout=30)
         if resp.status_code in (200, 201):
+            return True
+        if resp.status_code == 400 and "duplicated contacts" in resp.text:
+            print(f"  [GHL] Already exists (skipping duplicate): {email}")
             return True
         print(f"  [GHL] {resp.status_code} for {email}: {resp.text[:300]}")
         return False
