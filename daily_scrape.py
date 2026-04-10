@@ -621,11 +621,10 @@ def create_ghl_contact(name: str, email: str, instagram_url: str, phone: str,
         "email":      email,
         "locationId": GHL_LOCATION_ID,
         "tags":       GHL_TAGS,
-        "website":    instagram_url,
         "source":     "Instagram Scraper",
         "customFields": [
-            {"key": "contact.ig_followers", "field_value": str(follower_count)},
-            {"key": "contact.ig_profile",   "field_value": instagram_url},
+            {"id": "DA2fCg6Nx9GzY89FFeL9", "field_value": str(follower_count)},
+            {"id": "Cpku1neeHChg3CMXs0Ng", "field_value": instagram_url},
         ],
     }
     if phone:
