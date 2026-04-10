@@ -476,6 +476,8 @@ NON_NAME_KEYWORDS = [
     "ltd", "corp", "group", "team", "toronto", "vancouver", "calgary",
     "edmonton", "montreal", "ottawa", "niagara", "gta", "yyc", "yeg",
     "london", "miami", "chicago", "austin", "san diego", "content",
+    "sell", "buy", "lease", "pre-construction", "construction",
+    "investor", "investment", "specialized", "services", "consulting",
 ]
 
 
@@ -545,7 +547,9 @@ def _clean_person_name(raw: str) -> str:
     name = re.sub(r"\s*[\(\[].*?[\)\]].*$", "", name).strip()
     name = re.sub(r"[®™©]", "", name).strip()
     for kw in ["Real Estate", "Realtor", "Realty", "Agent", "Broker",
-               "REALTOR", "GTA", "YYC", "YEG", "Content"]:
+               "REALTOR", "GTA", "YYC", "YEG", "Content",
+               "Sell", "Buy", "Lease", "Pre-Construction", "Construction",
+               "Investor", "Investment", "Specialized", "Services", "Consulting"]:
         name = re.sub(rf"\b{kw}\b", "", name, flags=re.IGNORECASE).strip()
     name = re.sub(r"\s{2,}", " ", name).strip()
     name = name.strip("-– ")
