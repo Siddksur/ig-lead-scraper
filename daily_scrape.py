@@ -29,7 +29,7 @@ APIFY_BASE = "https://api.apify.com/v2"
 GHL_URL    = "https://services.leadconnectorhq.com/contacts/"
 GHL_TAGS   = ["cold-leads", "cold-email", "apify", "IG cold leads"]
 
-TARGET_PER_CITY = 500
+TARGET_PER_CITY = 200
 
 SHEET_HEADERS = ["Name", "Email", "Instagram URL", "Phone", "Status", "Date Added", "City", "IG Followers"]
 
