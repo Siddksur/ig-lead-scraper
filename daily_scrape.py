@@ -413,31 +413,45 @@ def format_status(ws, row: int, success: bool):
 
 # ── Apify ─────────────────────────────────────────────────────────────────────
 def run_apify(actor_input: dict) -> list:
-    resp = requests.post(
-        f"{APIFY_BASE}/acts/{ACTOR_ID}/runs?token={APIFY_TOKEN}",
-        json=actor_input,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    run_id = resp.json()["data"]["id"]
-    print(f"[Apify] Run started → {run_id}")
+    run_id = os.environ.get("APIFY_RUN_ID", "").strip()
 
-    terminal = {"SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"}
-    while True:
+    if run_id:
+        print(f"[Apify] Recovering from existing run → {run_id}")
         r = requests.get(
             f"{APIFY_BASE}/actor-runs/{run_id}?token={APIFY_TOKEN}",
-            timeout=15,
+            timeout=60,
         )
         r.raise_for_status()
-        data   = r.json()["data"]
-        status = data["status"]
-        print(f"[Apify] Status: {status}")
-        if status in terminal:
-            if status != "SUCCEEDED":
-                raise RuntimeError(f"Apify run ended: {status}")
-            dataset_id = data["defaultDatasetId"]
-            break
-        time.sleep(15)
+        data = r.json()["data"]
+        if data["status"] != "SUCCEEDED":
+            raise RuntimeError(f"Run {run_id} status is {data['status']} — can only recover SUCCEEDED runs")
+        dataset_id = data["defaultDatasetId"]
+    else:
+        resp = requests.post(
+            f"{APIFY_BASE}/acts/{ACTOR_ID}/runs?token={APIFY_TOKEN}",
+            json=actor_input,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        run_id = resp.json()["data"]["id"]
+        print(f"[Apify] Run started → {run_id}")
+
+        terminal = {"SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"}
+        while True:
+            r = requests.get(
+                f"{APIFY_BASE}/actor-runs/{run_id}?token={APIFY_TOKEN}",
+                timeout=60,
+            )
+            r.raise_for_status()
+            data   = r.json()["data"]
+            status = data["status"]
+            print(f"[Apify] Status: {status}")
+            if status in terminal:
+                if status != "SUCCEEDED":
+                    raise RuntimeError(f"Apify run ended: {status}")
+                dataset_id = data["defaultDatasetId"]
+                break
+            time.sleep(15)
 
     r = requests.get(
         f"{APIFY_BASE}/datasets/{dataset_id}/items"
