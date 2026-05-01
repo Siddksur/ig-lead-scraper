@@ -3,7 +3,7 @@ daily_scrape.py — Daily Instagram lead scraper for Canadian real estate agents
 Runs via GitHub Actions at 9am EST.
 Pipeline: Apify → clean names → Google Sheets → GoHighLevel
 
-City rotation: scrapes one city at a time until 500 leads are collected,
+City rotation: scrapes one city at a time until 200 leads are collected,
 then automatically moves to the next city.
 Cities: Toronto → Vancouver → Calgary → Edmonton → Mississauga → Hamilton → Halifax → Ottawa
 """
@@ -319,7 +319,7 @@ def get_current_city(ws) -> tuple:
             return city, counts
 
     # All 8 cities complete — restart from Toronto
-    print("[City] All cities have reached 500 leads! Restarting from Toronto.")
+    print(f"[City] All cities have reached {TARGET_PER_CITY} leads! Restarting from Toronto.")
     return CITIES[0], counts
 
 
@@ -679,7 +679,7 @@ def main():
     print(f"[City] Progress:")
     for city in CITIES:
         bar = "█" * (city_counts[city] // 25)  # 1 block per 25 leads
-        print(f"        {city:<12} {city_counts[city]:>3}/500  {bar}")
+        print(f"        {city:<12} {city_counts[city]:>3}/{TARGET_PER_CITY}  {bar}")
     print()
 
     # 2. Scrape via Apify using today's keyword batch for the current city
@@ -781,7 +781,7 @@ def main():
     print(f"  City: {current_city}")
     print(f"  Sent: {sent}  |  Failed: {failed}  |  Skipped: {skipped}")
     updated_count = city_counts[current_city] + sent
-    print(f"  {current_city} total: {updated_count}/500")
+    print(f"  {current_city} total: {updated_count}/{TARGET_PER_CITY}")
     if updated_count >= TARGET_PER_CITY:
         next_city = CITIES[(CITIES.index(current_city) + 1) % len(CITIES)]
         print(f"  ✓ {current_city} complete! Tomorrow: {next_city}")
