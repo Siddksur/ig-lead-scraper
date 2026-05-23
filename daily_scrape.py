@@ -438,19 +438,22 @@ def run_apify(actor_input: dict) -> list:
 
         terminal = {"SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"}
         while True:
-            r = requests.get(
-                f"{APIFY_BASE}/actor-runs/{run_id}?token={APIFY_TOKEN}",
-                timeout=60,
-            )
-            r.raise_for_status()
-            data   = r.json()["data"]
-            status = data["status"]
-            print(f"[Apify] Status: {status}")
-            if status in terminal:
-                if status != "SUCCEEDED":
-                    raise RuntimeError(f"Apify run ended: {status}")
-                dataset_id = data["defaultDatasetId"]
-                break
+            try:
+                r = requests.get(
+                    f"{APIFY_BASE}/actor-runs/{run_id}?token={APIFY_TOKEN}",
+                    timeout=120,
+                )
+                r.raise_for_status()
+                data   = r.json()["data"]
+                status = data["status"]
+                print(f"[Apify] Status: {status}")
+                if status in terminal:
+                    if status != "SUCCEEDED":
+                        raise RuntimeError(f"Apify run ended: {status}")
+                    dataset_id = data["defaultDatasetId"]
+                    break
+            except requests.exceptions.Timeout:
+                print("[Apify] Status poll timed out — retrying...")
             time.sleep(15)
 
     r = requests.get(
