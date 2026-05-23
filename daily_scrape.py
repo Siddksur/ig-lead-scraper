@@ -417,15 +417,27 @@ def run_apify(actor_input: dict) -> list:
 
     if run_id:
         print(f"[Apify] Recovering from existing run → {run_id}")
-        r = requests.get(
-            f"{APIFY_BASE}/actor-runs/{run_id}?token={APIFY_TOKEN}",
-            timeout=60,
-        )
-        r.raise_for_status()
-        data = r.json()["data"]
-        if data["status"] != "SUCCEEDED":
-            raise RuntimeError(f"Run {run_id} status is {data['status']} — can only recover SUCCEEDED runs")
-        dataset_id = data["defaultDatasetId"]
+        for attempt in range(1, 6):
+            try:
+                r = requests.get(
+                    f"{APIFY_BASE}/actor-runs/{run_id}?token={APIFY_TOKEN}",
+                    timeout=120,
+                )
+                if r.status_code in (502, 503, 504):
+                    print(f"[Apify] {r.status_code} on attempt {attempt} — retrying...")
+                    time.sleep(15)
+                    continue
+                r.raise_for_status()
+                data = r.json()["data"]
+                if data["status"] != "SUCCEEDED":
+                    raise RuntimeError(f"Run {run_id} status is {data['status']} — can only recover SUCCEEDED runs")
+                dataset_id = data["defaultDatasetId"]
+                break
+            except requests.exceptions.Timeout:
+                print(f"[Apify] Timeout on attempt {attempt} — retrying...")
+                time.sleep(15)
+        else:
+            raise RuntimeError(f"Could not fetch run {run_id} after 5 attempts")
     else:
         resp = requests.post(
             f"{APIFY_BASE}/acts/{ACTOR_ID}/runs?token={APIFY_TOKEN}",
